@@ -1,0 +1,869 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>학교 관리 — 로그인, 배치/자리뽑기, 급식, 달력/시간표</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg:#f6f7fb; --panel:#fff; --brand:#3a6ff7; --text:#1f2937; --muted:#6b7280;
+      --ok:#16a34a; --warn:#dc2626; --grid:#e5e7eb; --desk1:#e8f7ff; --desk2:#e8ffe9; --desk-border:#9db9ff;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",sans-serif}
+    header{display:flex;align-items:center;gap:12px;padding:14px 18px;background:var(--panel);border-bottom:1px solid #e5e7eb;position:sticky;top:0;z-index:10}
+    header h1{font-size:18px;margin:0}
+    .grow{flex:1}
+    .btn{appearance:none;border:1px solid #d1d5db;background:#fff;color:var(--text);padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600}
+    .btn.primary{background:var(--brand);color:#fff;border-color:var(--brand)}
+    .btn.success{background:var(--ok);color:#fff;border-color:var(--ok)}
+    .btn.warn{background:var(--warn);color:#fff;border-color:var(--warn)}
+    .btn.ghost{background:#fff;color:var(--brand);border-color:var(--brand)}
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+    input[type=text],input[type=date],select,textarea{width:100%;padding:8px 10px;border:1px solid #d1d5db;border-radius:8px}
+    textarea{min-height:92px;resize:vertical}
+    .status{color:var(--muted);font-size:13px}
+    .help{color:var(--muted);font-size:12px}
+    .panel{background:var(--panel);border:1px solid #e5e7eb;border-radius:12px;padding:14px}
+    .row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+    .wrap{display:grid;grid-template-columns:320px 1fr;gap:16px;padding:16px;align-items:start}
+    .tag{display:inline-block;padding:2px 8px;font-size:12px;border-radius:999px;background:#f3f4f6;color:#374151}
+    .code-badge{display:inline-flex;align-items:center;gap:8px;background:#eef2ff;color:#1e3a8a;padding:6px 10px;border-radius:8px;font-weight:700}
+    .list{max-height:200px;overflow:auto;border:1px solid #e5e7eb;border-radius:8px;padding:8px}
+    .list-item{display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border-bottom:1px dashed #eee}
+    .list-item:last-child{border-bottom:none}
+    .empty{color:var(--muted);font-size:13px;text-align:center;padding:12px 0}
+    .mt8{margin-top:8px}.mt12{margin-top:12px}.mt16{margin-top:16px}.mt24{margin-top:24px}
+    .danger{color:var(--warn)} .right{display:flex;gap:8px;align-items:center}
+    /* 탭 */
+    .tabs{display:flex;gap:8px;background:#fafafa;border-bottom:1px solid #e5e7eb;padding:10px 12px;position:sticky;top:57px;z-index:9}
+    .tab{padding:8px 12px;border-radius:999px;border:1px solid #d1d5db;background:#fff;cursor:pointer;font-weight:700}
+    .tab.active{background:var(--brand);color:#fff;border-color:var(--brand)}
+    /* 캔버스 */
+    .canvas-wrap{background:var(--panel);border:1px solid #e5e7eb;border-radius:12px;overflow:hidden}
+    .toolbar{display:flex;gap:8px;padding:10px;border-bottom:1px solid #e5e7eb;background:#fafafa;flex-wrap:wrap;align-items:center}
+    .legend{margin-left:auto;color:var(--muted);font-size:12px}
+    #roomNameTitle{font-weight:800}
+    .canvas{position:relative;width:100%;height:560px;background:repeating-linear-gradient(0deg,#fff,#fff 39px,#e5e7eb 40px),repeating-linear-gradient(90deg,transparent,transparent 39px,#e5e7eb 40px)}
+    .desk{position:absolute;width:110px;height:70px;border:2px solid var(--desk-border);border-radius:10px;cursor:grab;display:flex;flex-direction:column;align-items:center;justify-content:center;user-select:none;box-shadow:0 1px 0 rgba(0,0,0,.02),0 4px 16px rgba(0,0,0,.06)}
+    .desk.cap1{background:var(--desk1)} .desk.cap2{background:var(--desk2)}
+    .desk.dragging{opacity:.85;cursor:grabbing}
+    .desk .label{font-size:12px;color:#1f2937;font-weight:800}
+    .desk .seat{font-size:11px;color:#374151;margin-top:4px;white-space:nowrap}
+    .color-palette{display:flex;gap:6px;align-items:center}
+    .color-dot{width:20px;height:20px;border-radius:50%;border:1px solid #d1d5db;cursor:pointer}
+    .color-dot.selected{outline:2px solid #0002}
+    /* 로그인 */
+    .auth{display:grid;gap:12px;max-width:780px;margin:24px auto;padding:16px}
+    .auth .col{background:var(--panel);border:1px solid #e5e7eb;border-radius:12px;padding:16px}
+    .auth h3{margin:0 0 12px;font-size:16px}
+    /* 급식 */
+    .meals-wrap{background:var(--panel);border:1px solid #e5e7eb;border-radius:12px;padding:14px}
+    .meal-card{border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-top:10px}
+    .meal-title{font-weight:800;margin-bottom:6px}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;color:#374151;white-space:pre-wrap}
+    /* 달력 */
+    .calendar-wrap{display:grid;grid-template-columns:1.1fr .9fr;gap:16px;padding:16px}
+    .cal-panel,.plan-panel{background:var(--panel);border:1px solid #e5e7eb;border-radius:12px;padding:14px}
+    .cal-header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+    .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+    .cal-cell{background:#fff;border:1px solid #e5e7eb;border-radius:8px;min-height:68px;padding:6px;cursor:pointer}
+    .cal-cell.today{border-color:var(--brand)}
+    .cal-cell .d{font-weight:800}
+    .weekday{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:6px;color:#6b7280;font-weight:700}
+    .badge{display:inline-block;font-size:10px;background:#eef2ff;color:#1e3a8a;border:1px solid #dbeafe;border-radius:999px;padding:2px 6px;margin-top:6px}
+    .tt-row{display:flex;gap:6px;align-items:center;margin-bottom:6px}
+    .small{font-size:12px;color:#6b7280}
+    @media (max-width: 1100px){ .calendar-wrap{grid-template-columns:1fr} .wrap{grid-template-columns:1fr} .canvas{height:460px} }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>학교 관리 — 로그인, 배치/자리뽑기, 급식, 달력/시간표</h1>
+    <div class="grow"></div>
+    <div class="right">
+      <span id="sessionInfo" class="status">로그인 필요</span>
+      <button class="btn" id="logoutBtn" style="display:none;">로그아웃</button>
+    </div>
+  </header>
+
+  <!-- 탭 -->
+  <div class="tabs" id="tabs" style="display:none;">
+    <button class="tab active" data-tab="seating">자리/배치</button>
+    <button class="tab" data-tab="meals">급식</button>
+    <button class="tab" data-tab="calendar">달력</button>
+  </div>
+
+  <!-- 로그인/역할 -->
+  <section id="authSection" class="auth">
+    <div class="col">
+      <h3>교사 로그인</h3>
+      <div class="row"><label style="width:90px;">교사 이름</label><input type="text" id="teacherLoginName" placeholder="예) 김선생" /></div>
+      <div class="row"><label style="width:90px;">새 방 이름</label><input type="text" id="newRoomName" placeholder="예) 2학년 3반" /></div>
+      <div class="right">
+        <button class="btn primary" id="teacherCreateRoomBtn">방 만들고 입장</button>
+        <span class="help">방을 만들면 코드가 자동 생성됩니다.</span>
+      </div>
+      <div class="mt8 right">
+        <input type="text" id="teacherJoinCode" placeholder="기존 방 코드로 입장" />
+        <button class="btn" id="teacherJoinRoomBtn">입장</button>
+      </div>
+    </div>
+    <div class="col">
+      <h3>학생 로그인</h3>
+      <div class="row"><label style="width:90px;">학생 이름</label><input type="text" id="studentLoginName" placeholder="예) 홍길동" /></div>
+      <div class="row"><label style="width:90px;">방 코드</label><input type="text" id="studentRoomCode" placeholder="예) A3F7K2" /></div>
+      <div><button class="btn success" id="studentEnterBtn">참여하기</button> <span class="help">코드는 교사가 공유합니다.</span></div>
+    </div>
+  </section>
+
+  <!-- 메인 -->
+  <section id="appSection" style="display:none;">
+    <!-- 자리/배치 -->
+    <div id="seatingView">
+      <div class="wrap">
+        <section class="panel" id="leftPanel">
+          <h2>방 정보</h2>
+          <div class="row"><span class="code-badge">코드: <span id="roomCodeBadge"></span> <button class="btn ghost" id="copyCodeBtn">복사</button></span></div>
+          <div class="row"><span class="status" id="roleBadge"></span></div>
+
+          <div class="mt24" id="teacherRoster" style="display:none;">
+            <h2>학생 명단 관리 <span class="tag">교사</span></h2>
+            <div class="row"><input type="text" id="newStudentName" placeholder="학생 이름 추가" /><button class="btn" id="addStudentBtn">추가</button></div>
+            <div class="list" id="studentList"></div>
+            <div class="mt8"><button class="btn warn" id="clearSeatMapBtn">좌석 배정 초기화</button></div>
+          </div>
+
+          <div class="mt24">
+            <h2>출석/지각 <span class="tag">날짜별</span></h2>
+            <div class="row">
+              <input type="date" id="attDate" />
+              <button class="btn" id="attLoadBtn">불러오기</button>
+              <button class="btn primary" id="attSaveBtn">저장</button>
+            </div>
+            <div class="help">학생별 상태를 선택하세요. 지각/결석은 출석과 중복되지 않습니다.</div>
+            <div class="list" id="attList"><div class="empty">학생이 없습니다.</div></div>
+            <div class="mt8 status" id="attSummary"></div>
+          </div>
+
+          <div class="mt24" id="studentMySeat" style="display:none;">
+            <h2>내 자리 <span class="tag">학생</span></h2>
+            <div id="mySeatInfo" class="empty">아직 배정되지 않았습니다.</div>
+            <div class="help mt8">교사가 자리뽑기를 진행하면 자동 갱신됩니다.</div>
+          </div>
+        </section>
+
+        <section class="canvas-wrap">
+          <div class="toolbar">
+            <div id="roomNameTitle">방이 없습니다</div>
+            <div id="teacherTools" style="display:none; display:flex; gap:8px; align-items:center;">
+              <button class="btn" id="addDesk1Btn" disabled>1인 책상 추가</button>
+              <button class="btn" id="addDesk2Btn" disabled>2인 테이블 추가</button>
+              <button class="btn" id="saveLayoutBtn" disabled>배치 저장</button>
+              <button class="btn" id="resetLayoutBtn" disabled>모든 책상 삭제</button>
+              <select id="assignMode" disabled>
+                <option value="pair">2인 테이블 우선(2-2-2…)</option>
+                <option value="pairPlus">2인 테이블 + 남는 인원은 1인석</option>
+                <option value="single">개인석(1인 우선)</option>
+              </select>
+              <button class="btn primary" id="randomAssignBtn" disabled>자리뽑기</button>
+            </div>
+            <span class="legend">드래그 · 그리드 스냅(40px) · 겹침 방지</span>
+          </div>
+
+          <div class="panel mt8" id="colorPanel" style="margin:10px;">
+            <div class="row">
+              <strong>책상 색상</strong>
+              <div class="color-palette" id="colorPalette"></div>
+              <button class="btn" id="clearOneColorBtn" title="선택한 책상의 색상만 지우기">선택 책상 색상 지우기</button>
+            </div>
+            <div class="small">책상을 클릭해 선택한 뒤 색상을 칠하거나, 선택 책상 색상 지우기를 누르세요.</div>
+          </div>
+
+          <div class="canvas" id="canvas"></div>
+        </section>
+      </div>
+    </div>
+
+    <!-- 급식 -->
+    <div id="mealsView" style="display:none; padding:16px;">
+      <div class="meals-wrap">
+        <h2>급식 조회</h2>
+        <div class="row">
+          <div style="flex:1;">
+            <div class="row"><label style="width:120px;">API 키</label><input type="text" id="neisKey" placeholder="NEIS 오픈 API 키" /></div>
+            <div class="row"><label style="width:120px;">교육청 코드</label><input type="text" id="neisOffice" placeholder="예) B10 (서울), D10 (경기)" /></div>
+            <div class="row"><label style="width:120px;">학교 코드</label><input type="text" id="neisSchool" placeholder="나이스 학교 코드" /></div>
+            <div class="row"><button class="btn" id="saveNeisBtn">설정 저장</button><span class="help">브라우저에만 저장됩니다.</span></div>
+          </div>
+        </div>
+        <div class="mt16">
+          <div class="row">
+            <label style="width:120px;">날짜</label>
+            <input type="date" id="mealDate" />
+            <button class="btn" id="prevDayBtn">이전</button>
+            <button class="btn" id="todayBtn">오늘</button>
+            <button class="btn" id="nextDayBtn">다음</button>
+            <button class="btn primary" id="loadMealsBtn">급식 불러오기</button>
+          </div>
+          <div id="mealStatus" class="status">설정을 저장하고 날짜를 선택해 주세요.</div>
+          <div id="mealResults" class="mt12"></div>
+          <div class="mt12 help">괄호의 숫자는 알레르기 표기입니다.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 달력/시간표 -->
+    <div id="calendarView" style="display:none;">
+      <div class="calendar-wrap">
+        <div class="cal-panel">
+          <div class="cal-header">
+            <button class="btn" id="prevMonthBtn">이전 달</button>
+            <div id="calTitle" style="font-weight:800;"></div>
+            <button class="btn" id="nextMonthBtn">다음 달</button>
+            <div class="grow"></div>
+            <button class="btn ghost" id="goTodayBtn">오늘로</button>
+          </div>
+          <div class="weekday">
+            <div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div>
+          </div>
+          <div class="cal-grid" id="calGrid"></div>
+        </div>
+
+        <div class="plan-panel">
+          <h3 id="selectedDateTitle">날짜를 선택하세요</h3>
+          <div id="planView">
+            <div class="mt8">
+              <div class="tag">시간표(요일 패턴)</div>
+              <div id="ttList" class="mt8 small">선택된 날짜가 없습니다.</div>
+            </div>
+            <div class="mt16">
+              <div class="tag">메모</div>
+              <div class="mt8" id="noteBox"></div>
+            </div>
+            <div class="mt16 small" id="planInfo"></div>
+          </div>
+
+          <div id="teacherEdit" class="mt16" style="display:none;">
+            <h4 style="margin:0 0 8px;">주간 시간표 패턴 편집(월~금)</h4>
+            <div class="small">요일별 교시 수와 과목을 저장하면, 달력에서 해당 요일에 자동 적용됩니다.</div>
+            <div class="mt8">
+              <div class="tt-row"><strong style="width:28px;">월</strong><input type="number" min="0" max="10" id="pMonCnt" style="width:80px" value="7"><input type="text" id="pMon" placeholder="예) 1교시 수학,2 국어,3 영어..." /></div>
+              <div class="tt-row"><strong style="width:28px;">화</strong><input type="number" min="0" max="10" id="pTueCnt" style="width:80px" value="6"><input type="text" id="pTue" placeholder="예) 1 수학,2 과학,3 체육..." /></div>
+              <div class="tt-row"><strong style="width:28px;">수</strong><input type="number" min="0" max="10" id="pWedCnt" style="width:80px" value="6"><input type="text" id="pWed" placeholder="과목들을 쉼표로 구분" /></div>
+              <div class="tt-row"><strong style="width:28px;">목</strong><input type="number" min="0" max="10" id="pThuCnt" style="width:80px" value="6"><input type="text" id="pThu" placeholder="과목들을 쉼표로 구분" /></div>
+              <div class="tt-row"><strong style="width:28px;">금</strong><input type="number" min="0" max="10" id="pFriCnt" style="width:80px" value="5"><input type="text" id="pFri" placeholder="과목들을 쉼표로 구분" /></div>
+              <div class="mt8"><button class="btn primary" id="savePatternBtn">패턴 저장</button></div>
+            </div>
+
+            <div class="mt16">
+              <h4 style="margin:0 0 8px;">선택 날짜 메모</h4>
+              <textarea id="noteInput" placeholder="선택한 날짜의 공지/메모를 입력하세요."></textarea>
+              <div class="mt8"><button class="btn" id="saveNoteBtn">메모 저장</button></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    // 저장 키
+    const DB_KEY = "school_rooms_v4_calendar";
+    const SESSION_KEY = "school_session_v4_calendar";
+    const NEIS_KEY = "school_neis_settings_v4";
+
+    // 유틸
+    const $ = sel => document.querySelector(sel);
+    function loadDB(){ try{return JSON.parse(localStorage.getItem(DB_KEY)||"{}")}catch{return{}} }
+    function saveDB(db){ localStorage.setItem(DB_KEY, JSON.stringify(db)); }
+    function loadSession(){ try{return JSON.parse(localStorage.getItem(SESSION_KEY)||"null")}catch{return null} }
+    function saveSession(s){ localStorage.setItem(SESSION_KEY, JSON.stringify(s)); }
+    function clearSession(){ localStorage.removeItem(SESSION_KEY); }
+    function saveNeisSettings(v){ localStorage.setItem(NEIS_KEY, JSON.stringify(v)); }
+    function loadNeisSettings(){ try{return JSON.parse(localStorage.getItem(NEIS_KEY)||"null")}catch{return null} }
+    function genCode(len=6){ const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let out=""; for(let i=0;i<len;i++) out+=chars[Math.floor(Math.random()*chars.length)]; return out; }
+    function uid(){ return Math.random().toString(36).slice(2,9); }
+    function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } }
+    function ymd(dt){ const y=dt.getFullYear(), m=String(dt.getMonth()+1).padStart(2,"0"), d=String(dt.getDate()).padStart(2,"0"); return `${y}-${m}-${d}`; }
+    function ymdCompact(s){ return s.replaceAll("-",""); }
+    function firstOfMonth(d){ return new Date(d.getFullYear(), d.getMonth(), 1); }
+    function lastOfMonth(d){ return new Date(d.getFullYear(), d.getMonth()+1, 0); }
+    const WEEKNAMES = ["일","월","화","수","목","금","토"];
+
+    // 상태
+    let state = {
+      role:null, name:null, roomCode:null,
+      activeTab:"seating",
+      dragging:null, offsetX:0, offsetY:0,
+      selectedDeskId:null,
+      calCursor: new Date(),
+      calSelectedDate: null
+    };
+
+    // DOM 공통
+    const authSection = $("#authSection"); const appSection = $("#appSection");
+    const sessionInfo = $("#sessionInfo"); const logoutBtn = $("#logoutBtn");
+    const tabs = $("#tabs"); const tabButtons = tabs.querySelectorAll(".tab");
+    const seatingView = $("#seatingView"); const mealsView = $("#mealsView"); const calendarView = $("#calendarView");
+
+    // 로그인
+    const teacherLoginName = $("#teacherLoginName"); const newRoomName = $("#newRoomName");
+    const teacherCreateRoomBtn = $("#teacherCreateRoomBtn"); const teacherJoinCode = $("#teacherJoinCode"); const teacherJoinRoomBtn = $("#teacherJoinRoomBtn");
+    const studentLoginName = $("#studentLoginName"); const studentRoomCode = $("#studentRoomCode"); const studentEnterBtn = $("#studentEnterBtn");
+
+    // 자리/배치
+    const roomCodeBadge = $("#roomCodeBadge"); const copyCodeBtn = $("#copyCodeBtn"); const roleBadge = $("#roleBadge"); const roomNameTitle = $("#roomNameTitle");
+    const teacherTools = $("#teacherTools"); const addDesk1Btn = $("#addDesk1Btn"); const addDesk2Btn = $("#addDesk2Btn");
+    const saveLayoutBtn = $("#saveLayoutBtn"); const resetLayoutBtn = $("#resetLayoutBtn");
+    const randomAssignBtn = $("#randomAssignBtn"); const assignMode = $("#assignMode");
+    const teacherRoster = $("#teacherRoster"); const newStudentName = $("#newStudentName"); const addStudentBtn = $("#addStudentBtn");
+    const studentList = $("#studentList"); const clearSeatMapBtn = $("#clearSeatMapBtn");
+    const studentMySeat = $("#studentMySeat"); const mySeatInfo = $("#mySeatInfo");
+    const canvas = $("#canvas");
+    // 책상 색상
+    const colorPalette = $("#colorPalette"); const clearOneColorBtn = $("#clearOneColorBtn");
+    const PALETTE = ["#ffffff","#fde68a","#86efac","#93c5fd","#fda4af","#a5b4fc","#fbcfe8","#fca5a5","#d1fae5","#e5e7eb"];
+    // 출석/지각
+    const attDate = $("#attDate"); const attLoadBtn = $("#attLoadBtn"); const attSaveBtn = $("#attSaveBtn");
+    const attList = $("#attList"); const attSummary = $("#attSummary");
+
+    // 급식
+    const neisKey = $("#neisKey"); const neisOffice = $("#neisOffice"); const neisSchool = $("#neisSchool");
+    const saveNeisBtn = $("#saveNeisBtn"); const mealDate = $("#mealDate");
+    const prevDayBtn = $("#prevDayBtn"); const nextDayBtn = $("#nextDayBtn"); const todayBtn = $("#todayBtn"); const loadMealsBtn = $("#loadMealsBtn");
+    const mealStatus = $("#mealStatus"); const mealResults = $("#mealResults");
+
+    // 달력
+    const calTitle = $("#calTitle"); const calGrid = $("#calGrid");
+    const prevMonthBtn = $("#prevMonthBtn"); const nextMonthBtn = $("#nextMonthBtn"); const goTodayBtn = $("#goTodayBtn");
+    const selectedDateTitle = $("#selectedDateTitle"); const ttList = $("#ttList");
+    const noteBox = $("#noteBox"); const planInfo = $("#planInfo"); const teacherEdit = $("#teacherEdit");
+    const pMonCnt = $("#pMonCnt"), pTueCnt=$("#pTueCnt"), pWedCnt=$("#pWedCnt"), pThuCnt=$("#pThuCnt"), pFriCnt=$("#pFriCnt");
+    const pMon=$("#pMon"), pTue=$("#pTue"), pWed=$("#pWed"), pThu=$("#pThu"), pFri=$("#pFri");
+    const savePatternBtn = $("#savePatternBtn"); const noteInput = $("#noteInput"); const saveNoteBtn = $("#saveNoteBtn");
+
+    // 초기 세션
+    applySession();
+
+    // 세션 처리
+    function applySession(){
+      const s = loadSession();
+      if (s && s.role && s.name && s.roomCode) {
+        state.role=s.role; state.name=s.name; state.roomCode=s.roomCode;
+        authSection.style.display="none"; appSection.style.display="block"; tabs.style.display="flex";
+        logoutBtn.style.display="inline-flex"; sessionInfo.textContent=`${s.role==="teacher"?"교사":"학생"} ${s.name}님`;
+        setActiveTab(state.activeTab || "seating");
+      } else {
+        authSection.style.display="grid"; appSection.style.display="none"; tabs.style.display="none"; logoutBtn.style.display="none";
+        sessionInfo.textContent="로그인 필요";
+      }
+      refreshSeatingUI();
+      initMealsUI();
+      initCalendarUI();
+    }
+    logoutBtn.addEventListener("click", ()=>{ clearSession(); state={role:null,name:null,roomCode:null,activeTab:"seating",dragging:null,offsetX:0,offsetY:0,selectedDeskId:null,calCursor:new Date(),calSelectedDate:null}; applySession(); });
+
+    // 탭
+    tabButtons.forEach(btn=>btn.addEventListener("click",()=>setActiveTab(btn.dataset.tab)));
+    function setActiveTab(tab){
+      state.activeTab=tab;
+      tabButtons.forEach(b=>b.classList.toggle("active", b.dataset.tab===tab));
+      seatingView.style.display = tab==="seating"?"block":"none";
+      mealsView.style.display = tab==="meals"?"block":"none";
+      calendarView.style.display = tab==="calendar"?"block":"none";
+      if (tab==="calendar") renderCalendar();
+    }
+
+    // 로그인 이벤트
+    teacherCreateRoomBtn.addEventListener("click", ()=>{
+      const tname=teacherLoginName.value.trim(); const rname=newRoomName.value.trim();
+      if (!tname) return alert("교사 이름을 입력해 주세요."); if (!rname) return alert("새 방 이름을 입력해 주세요.");
+      let db=loadDB(); let code=genCode(); while(db[code]) code=genCode();
+      db[code]={ code, roomName:rname, teacherName:tname, desks:[], students:[], seatMap:{},
+        attendance:{}, // yyyymmdd -> { studentId: "present"|"late"|"absent" }
+        calendar:{ weeklyPattern: defaultWeeklyPattern(), notes:{} }, // notes[yyyy-mm-dd] = text
+        createdAt:Date.now()
+      };
+      saveDB(db);
+      state.role="teacher"; state.name=tname; state.roomCode=code; saveSession({role:state.role,name:state.name,roomCode:state.roomCode});
+      teacherLoginName.value=""; newRoomName.value=""; applySession(); alert(`방이 생성되었습니다. 코드: ${code}`);
+    });
+    teacherJoinRoomBtn.addEventListener("click", ()=>{
+      const tname=teacherLoginName.value.trim(); const code=(teacherJoinCode.value.trim()||"").toUpperCase();
+      if (!tname) return alert("교사 이름을 입력해 주세요."); if (!code) return alert("방 코드를 입력해 주세요.");
+      let db=loadDB(); if (!db[code]) return alert("해당 방을 찾을 수 없습니다.");
+      state.role="teacher"; state.name=tname; state.roomCode=code; saveSession({role:state.role,name:state.name,roomCode:state.roomCode});
+      applySession(); alert("입장했습니다.");
+    });
+    studentEnterBtn.addEventListener("click", ()=>{
+      const sname=studentLoginName.value.trim(); const code=(studentRoomCode.value.trim()||"").toUpperCase();
+      if (!sname) return alert("학생 이름을 입력해 주세요."); if (!code) return alert("방 코드를 입력해 주세요.");
+      let db=loadDB(); if (!db[code]) return alert("해당 방을 찾을 수 없습니다.");
+      if (!db[code].students.find(s=>s.name===sname)) { db[code].students.push({id:uid(),name:sname}); saveDB(db); }
+      state.role="student"; state.name=sname; state.roomCode=code; saveSession({role:state.role,name:state.name,roomCode:state.roomCode});
+      applySession(); alert("참여했습니다.");
+    });
+
+    // 공통 버튼
+    copyCodeBtn.addEventListener("click", async ()=>{
+      if (!state.roomCode) return; try{ await navigator.clipboard.writeText(state.roomCode); alert("방 코드가 복사되었습니다."); }catch{ alert("복사 실패. 직접 선택해 복사해 주세요."); }
+    });
+
+    // 자리/배치 UI
+    function refreshSeatingUI(){
+      if (!state.roomCode) return;
+      let db=loadDB(); const room=db[state.roomCode];
+      if (!room){ alert("방 정보를 찾을 수 없습니다. 다시 로그인해 주세요."); clearSession(); applySession(); return; }
+      roomCodeBadge.textContent=room.code; roleBadge.textContent=`${state.role==="teacher"?"교사":"학생"}: ${state.name}`;
+      roomNameTitle.textContent=`${room.roomName} (${room.code})`;
+      const isTeacher=state.role==="teacher";
+      teacherTools.style.display=isTeacher?"flex":"none";
+      teacherRoster.style.display=isTeacher?"block":"none";
+      studentMySeat.style.display=!isTeacher?"block":"none";
+      addDesk1Btn.disabled=!isTeacher; addDesk2Btn.disabled=!isTeacher; saveLayoutBtn.disabled=!isTeacher;
+      resetLayoutBtn.disabled=!isTeacher; randomAssignBtn.disabled=!isTeacher; assignMode.disabled=!isTeacher;
+
+      renderPalette();
+      renderDesks(); renderRoster(); renderMySeat();
+      initAttendance();
+    }
+
+    // 학생 명단
+    addStudentBtn.addEventListener("click", ()=>{
+      if (!state.roomCode || state.role!=="teacher") return;
+      const name=newStudentName.value.trim(); if (!name) return;
+      let db=loadDB(); const room=db[state.roomCode];
+      if (room.students.some(s=>s.name===name)) return alert("이미 존재하는 이름입니다.");
+      room.students.push({id:uid(),name}); saveDB(db);
+      newStudentName.value=""; renderRoster(); renderDesks(); renderMySeat(); initAttendance();
+    });
+    function removeStudent(sid){
+      let db=loadDB(); const room=db[state.roomCode];
+      room.students=room.students.filter(s=>s.id!==sid);
+      for(const did of Object.keys(room.seatMap)){ const v=room.seatMap[did]; if(Array.isArray(v)){ const nv=v.filter(x=>x && x!==sid); if(nv.length) room.seatMap[did]=nv; else delete room.seatMap[did]; } else { if(v===sid) delete room.seatMap[did]; } }
+      // 출석 데이터에서도 제거
+      if (room.attendance){ for(const day of Object.keys(room.attendance)){ if(room.attendance[day] && room.attendance[day][sid]) delete room.attendance[day][sid]; } }
+      saveDB(db); renderRoster(); renderDesks(); renderMySeat(); initAttendance();
+    }
+    function renderRoster(){
+      if (!state.roomCode){ studentList.innerHTML=""; return; }
+      const db=loadDB(); const room=db[state.roomCode]; const list=room.students; const seatMap=room.seatMap||{};
+      if (!list.length){ studentList.innerHTML=`<div class="empty">학생이 없습니다.</div>`; return; }
+      studentList.innerHTML="";
+      for (const s of list) {
+        const item=document.createElement("div"); item.className="list-item";
+        const left=document.createElement("div");
+        const assigned = findStudentDesk(seatMap, s.id);
+        left.innerHTML = `<strong>${s.name}</strong> ${assigned?`<span class="tag">배정됨</span>`:`<span class="tag">미배정</span>`}`;
+        const right=document.createElement("div"); const rm=document.createElement("button"); rm.className="btn"; rm.textContent="제거";
+        rm.addEventListener("click",()=>{ if(state.role==="teacher" && confirm(`"${s.name}" 학생을 제거할까요?`)) removeStudent(s.id); });
+        right.appendChild(rm); item.appendChild(left); item.appendChild(right); studentList.appendChild(item);
+      }
+    }
+    function findStudentDesk(seatMap, sid){
+      for (const did of Object.keys(seatMap)) {
+        const v = seatMap[did];
+        if (Array.isArray(v)){ if(v.includes(sid)) return did; } else { if(v===sid) return did; }
+      }
+      return null;
+    }
+
+    // 책상/테이블
+    addDesk1Btn.addEventListener("click",()=>addDesk(1));
+    addDesk2Btn.addEventListener("click",()=>addDesk(2));
+    function addDesk(capacity){
+      if (!state.roomCode || state.role!=="teacher") return;
+      let db=loadDB(); const room=db[state.roomCode];
+      const id=uid(); const idx=room.desks.length;
+      const newDesk={ id, x:40*(idx%8), y:40*Math.floor(idx/8), label:`${capacity===2?"T":"D"}-${idx+1}`, capacity, color:"#ffffff" };
+      room.desks.push(newDesk); saveDB(db); renderDesks();
+    }
+    resetLayoutBtn.addEventListener("click", ()=>{
+      if (!state.roomCode || state.role!=="teacher") return;
+      if (!confirm("모든 책상을 삭제할까요? 좌석 배정도 함께 초기화됩니다.")) return;
+      let db=loadDB(); const room=db[state.roomCode]; room.desks=[]; room.seatMap={}; saveDB(db);
+      renderDesks(); renderRoster(); renderMySeat();
+    });
+    saveLayoutBtn.addEventListener("click", ()=>alert("배치가 저장되었습니다."));
+
+    // 자리뽑기(2인은 가급적 2명씩)
+    randomAssignBtn.addEventListener("click", ()=>{
+      if (!state.roomCode || state.role!=="teacher") return;
+      let db=loadDB(); const room=db[state.roomCode];
+      if (room.students.length===0) return alert("학생이 없습니다.");
+      if (room.desks.length===0) return alert("책상이 없습니다.");
+      const mode=assignMode.value; room.seatMap={};
+      const desks1=room.desks.filter(d=>d.capacity===1), desks2=room.desks.filter(d=>d.capacity===2);
+      const students=[...room.students]; shuffle(desks1); shuffle(desks2); shuffle(students);
+      let si=0;
+      // 2인 테이블은 우선 2명씩
+      for(const d of desks2){ if (si+1<students.length){ room.seatMap[d.id]=[students[si++].id, students[si++].id]; } }
+      if (mode==="pair"){ /* 남는 학생 배정 안 함 */ }
+      else if (mode==="pairPlus"){
+        for(const d of desks1){ if(si>=students.length) break; room.seatMap[d.id]=students[si++].id; }
+        for(const d of desks2){ if(si>=students.length) break; const cur=room.seatMap[d.id]; if(!cur) room.seatMap[d.id]=[students[si++].id]; else if(Array.isArray(cur)&&cur.length===1) room.seatMap[d.id]=[cur[0],students[si++].id]; }
+      } else { // single
+        for(const d of desks1){ if(si>=students.length) break; room.seatMap[d.id]=students[si++].id; }
+        for(const d of desks2){ if(si>=students.length) break; const cur=room.seatMap[d.id]; if(!cur) room.seatMap[d.id]=[students[si++].id]; else if(Array.isArray(cur)&&cur.length===1) room.seatMap[d.id]=[cur[0],students[si++].id]; }
+      }
+      rebalancePairsPreferFull(room);
+      saveDB(db); renderDesks(); renderRoster(); renderMySeat(); alert("자리뽑기가 완료되었습니다.");
+    });
+    function rebalancePairsPreferFull(room){
+      const desks1=room.desks.filter(d=>d.capacity===1), desks2=room.desks.filter(d=>d.capacity===2);
+      const emptySingles=[]; for(const d of desks1){ if(!room.seatMap[d.id]) emptySingles.push(d.id); }
+      if (!emptySingles.length) return;
+      for (const d of desks2){
+        const v=room.seatMap[d.id]; if (Array.isArray(v) && v.length===1 && emptySingles.length>0){
+          const lone=v[0]; const target=emptySingles.pop(); delete room.seatMap[d.id]; room.seatMap[target]=lone;
+        }
+      }
+    }
+
+    // 책상 렌더 + 색상 선택/지우기
+    function renderDesks(){
+      canvas.innerHTML=""; if (!state.roomCode) return;
+      const db=loadDB(); const room=db[state.roomCode]; const seatMap=room.seatMap||{};
+      for (const d of room.desks){
+        const el=document.createElement("div");
+        el.className=`desk cap${d.capacity}`;
+        el.style.left=d.x+"px"; el.style.top=d.y+"px"; el.dataset.id=d.id;
+        el.style.backgroundColor = d.color || (d.capacity===2?"#e8ffe9":"#e8f7ff");
+        const label=document.createElement("div"); label.className="label"; label.textContent=`${d.label} (${d.capacity===2?"2인":"1인"})`;
+        const seat=document.createElement("div"); seat.className="seat";
+        const val=seatMap[d.id];
+        if (d.capacity===1){
+          if (val){ const stu=room.students.find(s=>s.id===val); seat.textContent=stu?`→ ${stu.name}`:"배정 없음"; }
+          else seat.textContent="배정 없음";
+        } else {
+          const names=[]; if (Array.isArray(val)){ val.forEach(v=>{ const s=room.students.find(ss=>ss.id===v); if(s) names.push(s.name); }); }
+          seat.textContent=names.length?`→ ${names.join(" · ")}`:"빈 자리 2";
+        }
+        el.appendChild(label); el.appendChild(seat); canvas.appendChild(el);
+        // 선택/드래그
+        el.addEventListener("click", ()=>{ state.selectedDeskId=d.id; highlightSelectedDesk(); });
+        if (state.role==="teacher") makeDraggable(el, d);
+      }
+      highlightSelectedDesk();
+    }
+    function highlightSelectedDesk(){
+      [...canvas.querySelectorAll(".desk")].forEach(e=>e.style.outline="none");
+      if (!state.selectedDeskId) return;
+      const el = [...canvas.querySelectorAll(".desk")].find(e=>e.dataset.id===state.selectedDeskId);
+      if (el) el.style.outline="3px solid rgba(58,111,247,.4)";
+    }
+    function renderPalette(){
+      colorPalette.innerHTML="";
+      for (const c of PALETTE){
+        const dot=document.createElement("div");
+        dot.className="color-dot"; dot.style.background=c;
+        dot.title=c;
+        dot.addEventListener("click", ()=> applyColorToSelected(c));
+        colorPalette.appendChild(dot);
+      }
+    }
+    function applyColorToSelected(color){
+      if (!state.roomCode || state.role!=="teacher") return;
+      if (!state.selectedDeskId) { alert("먼저 책상을 선택해 주세요."); return; }
+      let db=loadDB(); const room=db[state.roomCode];
+      const d = room.desks.find(x=>x.id===state.selectedDeskId); if (!d) return;
+      d.color = color; saveDB(db); renderDesks();
+    }
+    clearOneColorBtn.addEventListener("click", ()=>{
+      if (!state.roomCode || state.role!=="teacher") return;
+      if (!state.selectedDeskId){ alert("먼저 책상을 선택해 주세요."); return; }
+      let db=loadDB(); const room=db[state.roomCode];
+      const d = room.desks.find(x=>x.id===state.selectedDeskId); if (!d) return;
+      d.color = d.capacity===2 ? "#e8ffe9" : "#e8f7ff"; // 기본색으로 복귀(= 단일 색상 지우기)
+      saveDB(db); renderDesks();
+    });
+
+    // 드래그
+    function makeDraggable(el, deskData){
+      el.addEventListener("mousedown", (e)=>startDrag(e, el, deskData));
+      el.addEventListener("touchstart", (e)=>startDrag(e.touches[0], el, deskData), {passive:false});
+    }
+    function startDrag(e, el, deskData){
+      e.preventDefault();
+      state.dragging={el,deskData}; el.classList.add("dragging");
+      const rect=el.getBoundingClientRect(); const cRect=canvas.getBoundingClientRect();
+      state.offsetX=e.clientX-rect.left; state.offsetY=e.clientY-rect.top;
+      function onMove(ev){
+        const p=("touches" in ev)?ev.touches[0]:ev;
+        let nx=p.clientX - cRect.left - state.offsetX; let ny=p.clientY - cRect.top - state.offsetY;
+        nx=Math.max(0, Math.min(nx, canvas.clientWidth-el.clientWidth));
+        ny=Math.max(0, Math.min(ny, canvas.clientHeight-el.clientHeight));
+        nx=Math.round(nx/40)*40; ny=Math.round(ny/40)*40;
+        el.style.left=nx+"px"; el.style.top=ny+"px";
+      }
+      function onUp(){
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+        document.removeEventListener("touchmove", onMove);
+        document.removeEventListener("touchend", onUp);
+        el.classList.remove("dragging");
+        const nx=parseInt(el.style.left,10), ny=parseInt(el.style.top,10);
+        if (hasCollision(deskData.id, nx, ny)) { alert("다른 책상과 겹칩니다. 위치를 조정해 주세요."); el.style.left=deskData.x+"px"; el.style.top=deskData.y+"px"; }
+        else { let db=loadDB(); const room=db[state.roomCode]; const target=room.desks.find(d=>d.id===deskData.id); target.x=nx; target.y=ny; saveDB(db); }
+        state.dragging=null;
+      }
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+      document.addEventListener("touchmove", onMove, {passive:false});
+      document.addEventListener("touchend", onUp);
+    }
+    function hasCollision(id,x,y){
+      let db=loadDB(); const room=db[state.roomCode]; const w=110,h=70;
+      for (const d of room.desks){ if(d.id===id) continue; const dx=d.x,dy=d.y;
+        if (!(x+w<=dx || dx+w<=x || y+h<=dy || dy+h<=y)) return true; }
+      return false;
+    }
+
+    // 학생: 내 자리
+    function renderMySeat(){
+      if (!state.roomCode || state.role!=="student") return;
+      const db=loadDB(); const room=db[state.roomCode]; const me=room.students.find(s=>s.name===state.name);
+      if (!me){ mySeatInfo.innerHTML=`<span class="danger">명단에 없습니다. 다시 참여해 주세요.</span>`; return; }
+      const seatMap=room.seatMap||{}; const did=findStudentDesk(seatMap, me.id);
+      if (!did){ mySeatInfo.textContent="아직 배정되지 않았습니다."; return; }
+      const desk=room.desks.find(d=>d.id===did); if(!desk){ mySeatInfo.textContent="아직 배정되지 않았습니다."; return; }
+      if (desk.capacity===1){
+        mySeatInfo.innerHTML=`<div>배정된 자리: <strong>${desk.label} (1인)</strong></div><div class="status">위치: (${desk.x}, ${desk.y})</div>`;
+      } else {
+        const mates=[]; const val=seatMap[desk.id];
+        if (Array.isArray(val)) val.forEach(v=>{ if(v===me.id) return; const m=room.students.find(s=>s.id===v); if(m) mates.push(m.name); });
+        mySeatInfo.innerHTML=`<div>배정된 자리: <strong>${desk.label} (2인)</strong></div><div class="status">짝꿍: ${mates.length?mates.join(" / "):"아직 없음"}</div><div class="status">위치: (${desk.x}, ${desk.y})</div>`;
+      }
+    }
+
+    // 출석/지각(날짜별 상태)
+    function initAttendance(){
+      attDate.value = ymd(new Date());
+      renderAttendanceList();
+    }
+    attLoadBtn.addEventListener("click", renderAttendanceList);
+    attSaveBtn.addEventListener("click", saveAttendance);
+
+    function renderAttendanceList(){
+      if (!state.roomCode){ attList.innerHTML=`<div class="empty">방이 없습니다.</div>`; return; }
+      let db=loadDB(); const room=db[state.roomCode];
+      const dayKey = ymdCompact(attDate.value || ymd(new Date()));
+      const rec = (room.attendance && room.attendance[dayKey]) || {};
+      if (!room.students.length){ attList.innerHTML=`<div class="empty">학생이 없습니다.</div>`; attSummary.textContent=""; return; }
+      attList.innerHTML="";
+      let cntP=0,cntL=0,cntA=0;
+      for (const s of room.students){
+        const st = rec[s.id] || "present";
+        if (st==="present") cntP++; else if (st==="late") cntL++; else if (st==="absent") cntA++;
+        const row=document.createElement("div"); row.className="list-item";
+        const left=document.createElement("div"); left.innerHTML=`<strong>${s.name}</strong>`;
+        const right=document.createElement("div");
+        const sel=document.createElement("select");
+        sel.innerHTML=`<option value="present">출석</option><option value="late">지각</option><option value="absent">결석</option>`;
+        sel.value=st;
+        sel.addEventListener("change",()=>{ /* no immediate save */ });
+        sel.dataset.sid=s.id;
+        right.appendChild(sel);
+        row.appendChild(left); row.appendChild(right);
+        attList.appendChild(row);
+      }
+      attSummary.textContent=`출석 ${cntP} · 지각 ${cntL} · 결석 ${cntA}`;
+    }
+
+    function saveAttendance(){
+      if (state.role!=="teacher") { alert("교사만 저장할 수 있습니다."); return; }
+      let db=loadDB(); const room=db[state.roomCode];
+      const dayKey = ymdCompact(attDate.value || ymd(new Date()));
+      room.attendance = room.attendance || {};
+      room.attendance[dayKey] = room.attendance[dayKey] || {};
+      const selects = attList.querySelectorAll("select");
+      let cntP=0,cntL=0,cntA=0;
+      selects.forEach(sel=>{
+        const sid=sel.dataset.sid; const val=sel.value;
+        room.attendance[dayKey][sid]=val;
+        if (val==="present") cntP++; else if (val==="late") cntL++; else if (val==="absent") cntA++;
+      });
+      saveDB(db);
+      attSummary.textContent=`출석 ${cntP} · 지각 ${cntL} · 결석 ${cntA}`;
+      alert("출석/지각이 저장되었습니다.");
+    }
+
+    // 급식
+    function initMealsUI(){
+      const settings=loadNeisSettings();
+      if (settings){ neisKey.value=settings.key||""; neisOffice.value=settings.office||""; neisSchool.value=settings.school||""; }
+      mealDate.value = ymd(new Date());
+      mealStatus.textContent = "설정을 저장하고 날짜를 선택해 주세요.";
+      mealResults.innerHTML="";
+    }
+    saveNeisBtn.addEventListener("click", ()=>{
+      const key=neisKey.value.trim(), office=neisOffice.value.trim(), school=neisSchool.value.trim();
+      if (!key||!office||!school) return alert("API 키, 교육청 코드, 학교 코드를 모두 입력해 주세요.");
+      saveNeisSettings({key,office,school}); mealStatus.textContent="설정을 저장했습니다. 날짜를 선택하고 불러오기를 눌러주세요."; alert("저장되었습니다.");
+    });
+    prevDayBtn.addEventListener("click", ()=>{ const d=new Date(mealDate.value); d.setDate(d.getDate()-1); mealDate.value=ymd(d); });
+    nextDayBtn.addEventListener("click", ()=>{ const d=new Date(mealDate.value); d.setDate(d.getDate()+1); mealDate.value=ymd(d); });
+    todayBtn.addEventListener("click", ()=>{ mealDate.value=ymd(new Date()); });
+    loadMealsBtn.addEventListener("click", loadMeals);
+    async function loadMeals(){
+      const settings=loadNeisSettings(); if(!settings||!settings.key||!settings.office||!settings.school){ alert("먼저 API 키와 교육청/학교 코드를 저장해 주세요."); return; }
+      const ymdStr=ymdCompact(mealDate.value); const base="https://open.neis.go.kr/hub/mealServiceDietInfo";
+      const url=`${base}?KEY=${encodeURIComponent(settings.key)}&Type=json&ATPT_OFCDC_SC_CODE=${encodeURIComponent(settings.office)}&SD_SCHUL_CODE=${encodeURIComponent(settings.school)}&MLSV_YMD=${ymdStr}`;
+      mealStatus.textContent="불러오는 중..."; mealResults.innerHTML="";
+      try{
+        const res=await fetch(url); if(!res.ok) throw new Error("요청 실패");
+        const data=await res.json(); const set=data.mealServiceDietInfo;
+        if(!set || !Array.isArray(set) || !set[1] || !set[1].row || !set[1].row.length){ mealStatus.textContent="해당 날짜의 급식 정보가 없습니다."; return; }
+        const rows=set[1].row; renderMeals(rows); mealStatus.textContent=`불러왔습니다: ${mealDate.value}`;
+      }catch(e){ console.error(e); mealStatus.textContent="불러오기에 실패했습니다. 설정/네트워크를 확인해 주세요."; }
+    }
+    function renderMeals(rows){
+      const map={"조식":[],"중식":[],"석식":[]};
+      rows.forEach(r=>{ const type=r.MMEAL_SC_NM; const raw=r.DDISH_NM||""; const clean=sanitizeMenu(raw); if(map[type]) map[type].push(clean); });
+      mealResults.innerHTML=`
+        <div class="meal-card"><div class="meal-title">조식</div><div class="mono">${map["조식"].length?map["조식"].join("\n\n"):"제공 없음"}</div></div>
+        <div class="meal-card"><div class="meal-title">중식</div><div class="mono">${map["중식"].length?map["중식"].join("\n\n"):"제공 없음"}</div></div>
+        <div class="meal-card"><div class="meal-title">석식</div><div class="mono">${map["석식"].length?map["석식"].join("\n\n"):"제공 없음"}</div></div>
+      `;
+    }
+    function sanitizeMenu(htmlText){
+      let txt=htmlText.replace(/<br\s*\/?>/gi,"\n");
+      txt=txt.replace(/\((\d+(?:\.\d+)*)\.\)/g,(m,g1)=>` [알레르기: ${g1.split(".").join(",")}]`);
+      txt=txt.replace(/<\/?[^>]+>/g,"");
+      return txt;
+    }
+
+    // 달력/시간표
+    function defaultWeeklyPattern(){
+      return {
+        Mon:{count:7, subjects:["수학","국어","영어","과학","체육","사회","자율"]},
+        Tue:{count:6, subjects:["수학","과학","국어","음악","미술","체육"]},
+        Wed:{count:6, subjects:["영어","수학","사회","국어","창체","자율"]},
+        Thu:{count:6, subjects:["과학","수학","체육","국어","사회","음악"]},
+        Fri:{count:5, subjects:["국어","영어","미술","체육","창체"]}
+      };
+    }
+    function initCalendarUI(){
+      if (!state.roomCode) return;
+      const db=loadDB(); const room=db[state.roomCode];
+      const isTeacher = state.role==="teacher";
+      teacherEdit.style.display = isTeacher ? "block" : "none";
+      // 로드 패턴
+      const pat = (room.calendar && room.calendar.weeklyPattern) || defaultWeeklyPattern();
+      pMonCnt.value = pat.Mon?.count ?? 7; pTueCnt.value = pat.Tue?.count ?? 6; pWedCnt.value = pat.Wed?.count ?? 6; pThuCnt.value = pat.Thu?.count ?? 6; pFriCnt.value = pat.Fri?.count ?? 5;
+      pMon.value = (pat.Mon?.subjects||[]).join(","); pTue.value=(pat.Tue?.subjects||[]).join(","); pWed.value=(pat.Wed?.subjects||[]).join(","); pThu.value=(pat.Thu?.subjects||[]).join(","); pFri.value=(pat.Fri?.subjects||[]).join(",");
+      // 초기 선택 날짜
+      state.calCursor = new Date(); state.calSelectedDate = null;
+      renderCalendar();
+      selectedDateTitle.textContent="날짜를 선택하세요";
+      ttList.textContent="선택된 날짜가 없습니다.";
+      noteBox.innerHTML="";
+      planInfo.textContent="";
+    }
+    prevMonthBtn.addEventListener("click", ()=>{ const d=state.calCursor; state.calCursor=new Date(d.getFullYear(), d.getMonth()-1, 1); renderCalendar(); });
+    nextMonthBtn.addEventListener("click", ()=>{ const d=state.calCursor; state.calCursor=new Date(d.getFullYear(), d.getMonth()+1, 1); renderCalendar(); });
+    goTodayBtn.addEventListener("click", ()=>{ state.calCursor = new Date(); renderCalendar(); });
+
+    function renderCalendar(){
+      if (!state.roomCode) return;
+      const view = new Date(state.calCursor.getFullYear(), state.calCursor.getMonth(), 1);
+      const first = firstOfMonth(view), last = lastOfMonth(view);
+      calTitle.textContent = `${view.getFullYear()}년 ${view.getMonth()+1}월`;
+      calGrid.innerHTML="";
+      const startIdx = first.getDay();
+      const total = startIdx + last.getDate();
+      const rows = Math.ceil(total / 7) * 7;
+      const todayStr = ymd(new Date());
+      for (let i=0;i<rows;i++){
+        const cell = document.createElement("div"); cell.className="cal-cell";
+        const dayNum = i - startIdx + 1;
+        if (dayNum>=1 && dayNum<=last.getDate()){
+          const cur = new Date(view.getFullYear(), view.getMonth(), dayNum);
+          const dStr = ymd(cur); if (dStr===todayStr) cell.classList.add("today");
+          const d = document.createElement("div"); d.className="d"; d.textContent=String(dayNum);
+          cell.appendChild(d);
+          // 표시: 메모 배지/출석 요약(선택)
+          const info = getCalendarInfo(dStr);
+          if (info.hasNote){ const b=document.createElement("div"); b.className="badge"; b.textContent="메모"; cell.appendChild(b); }
+          if (info.hasAttendance){ const b=document.createElement("div"); b.className="badge"; b.textContent=`출석 ${info.attP} · 지각 ${info.attL}`; cell.appendChild(b); }
+          cell.addEventListener("click", ()=> selectCalendarDate(dStr));
+        }
+        calGrid.appendChild(cell);
+      }
+    }
+    function getCalendarInfo(dateStr){
+      const db=loadDB(); const room=db[state.roomCode];
+      const dayKey = ymdCompact(dateStr);
+      const hasAttendance = !!(room.attendance && room.attendance[dayKey]);
+      let attP=0, attL=0;
+      if (hasAttendance){
+        const rec = room.attendance[dayKey];
+        Object.values(rec).forEach(v=>{ if(v==="present") attP++; else if(v==="late") attL++; });
+      }
+      const hasNote = !!(room.calendar && room.calendar.notes && room.calendar.notes[dateStr]);
+      return { hasAttendance, attP, attL, hasNote };
+    }
+    function selectCalendarDate(dateStr){
+      state.calSelectedDate = dateStr;
+      selectedDateTitle.textContent = `${dateStr} ( ${WEEKNAMES[new Date(dateStr).getDay()]} )`;
+      renderTimetableForDate(dateStr);
+      renderNoteForDate(dateStr);
+      planInfo.textContent = "요일 패턴을 바꾸면 해당 요일의 모든 날짜에 반영됩니다. 메모는 선택한 날짜에만 저장됩니다.";
+    }
+    function renderTimetableForDate(dateStr){
+      const db=loadDB(); const room=db[state.roomCode];
+      const pat = room.calendar?.weeklyPattern || defaultWeeklyPattern();
+      const w = new Date(dateStr).getDay(); // 0~6
+      const key = w===1?"Mon": w===2?"Tue": w===3?"Wed": w===4?"Thu": w===5?"Fri": null;
+      if (!key){ ttList.innerHTML = "주말에는 시간표가 없습니다."; return; }
+      const p = pat[key] || {count:0, subjects:[]};
+      const list = [];
+      for (let i=0;i<p.count;i++){
+        const subj = (p.subjects && p.subjects[i]) ? p.subjects[i] : `${i+1}교시`;
+        list.push(`${i+1}교시 — ${subj}`);
+      }
+      ttList.innerHTML = list.length ? list.map(x=>`• ${x}`).join("<br>") : "설정된 시간표가 없습니다.";
+      // 교사용 편집 영역의 과목 입력은 요일별 전체 패턴으로 저장 버튼에서 처리
+    }
+    function renderNoteForDate(dateStr){
+      const db=loadDB(); const room=db[state.roomCode];
+      const isTeacher = state.role==="teacher";
+      const note = room.calendar?.notes?.[dateStr] || "";
+      noteBox.innerHTML = note ? `<div class="panel" style="padding:10px">${note.replace(/\n/g,"<br/>")}</div>` : `<div class="empty">메모가 없습니다.</div>`;
+      // 에디터
+      if (isTeacher){
+        noteInput.value = note;
+      }
+    }
+    savePatternBtn.addEventListener("click", ()=>{
+      if (state.role!=="teacher") return alert("교사만 수정할 수 있습니다.");
+      let db=loadDB(); const room=db[state.roomCode];
+      const pack = (cntEl, txtEl)=>({ count: Math.max(0, Math.min(10, parseInt(cntEl.value||"0"))), subjects: (txtEl.value||"").split(",").map(s=>s.trim()).filter(Boolean) });
+      const weekly = { Mon:pack(pMonCnt,pMon), Tue:pack(pTueCnt,pTue), Wed:pack(pWedCnt,pWed), Thu:pack(pThuCnt,pThu), Fri:pack(pFriCnt,pFri) };
+      room.calendar = room.calendar || { weeklyPattern: defaultWeeklyPattern(), notes:{} };
+      room.calendar.weeklyPattern = weekly;
+      saveDB(db);
+      // 선택 중인 날짜 갱신
+      if (state.calSelectedDate) renderTimetableForDate(state.calSelectedDate);
+      alert("주간 시간표 패턴을 저장했습니다.");
+    });
+    saveNoteBtn.addEventListener("click", ()=>{
+      if (state.role!=="teacher") return alert("교사만 저장할 수 있습니다.");
+      if (!state.calSelectedDate) return alert("먼저 날짜를 선택해 주세요.");
+      let db=loadDB(); const room=db[state.roomCode];
+      room.calendar = room.calendar || { weeklyPattern: defaultWeeklyPattern(), notes:{} };
+      room.calendar.notes[state.calSelectedDate] = noteInput.value || "";
+      saveDB(db);
+      renderNoteForDate(state.calSelectedDate);
+      renderCalendar();
+      alert("메모를 저장했습니다.");
+    });
+
+    // 출석 배지 등을 위해 달력 재렌더 시 오늘 설정 반영
+    // 이미 renderCalendar 내부에서 반영
+
+  </script>
+</body>
+</html>
